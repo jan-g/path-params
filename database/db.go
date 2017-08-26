@@ -152,6 +152,44 @@ func splitPath(path string) []prefixPath {
 }
 
 func (db *InmemDb) DelRoute(app string, path string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, ok := db.paths[app]
+	if !ok {
+		return fmt.Errorf("app %v does not exist", app)
+	}
+
+	node, ok := db.paths[app + path]
+	if !ok || node.Route == nil {
+		return fmt.Errorf("app %v does not have a route for %v", app, path)
+	}
+
+	erase := len(node.Children) == 0
+	gen := uint64(0)
+
+	splits := splitPath(path)
+	for i := len(splits) - 1; i >= 0; i-- {
+		prefix, next := splits[i].prefix, splits[i].next
+		node = db.paths[app + prefix]
+		if next != "" {
+			if erase {
+				delete(node.Children, next)
+			} else {
+				node.Children[next].Generation = gen
+			}
+		} else {
+			node.Route = nil
+		}
+		if len(node.Children) == 0 && node.Route == nil && prefix != "" {
+			// This can only be true if erase was already true.
+			delete(db.paths, app + prefix)
+		} else {
+			node.Generation ++
+			gen = node.Generation
+			erase = false
+		}
+	}
 	return nil
 }
 
