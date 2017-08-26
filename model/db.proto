@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package model;
+
+message PathPart {
+    string path = 1;
+    uint64 generation = 2;
+
+    message ChildNode {
+        string name = 1;
+        uint64 generation = 2;
+    }
+
+    map<string, ChildNode> children = 3;
+
+    message Route {
+        string path = 1;
+    }
+
+    Route route = 4;
+}
