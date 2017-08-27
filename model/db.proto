@@ -13,9 +13,11 @@ message PathPart {
 
     map<string, ChildNode> children = 3;
 
-    message Route {
-        string path = 1;
-    }
+    RouteData route = 4;
+}
 
-    Route route = 4;
+message RouteData {
+    string path = 1;
+    repeated string params = 2;
+    map<string, string> config = 3;
 }

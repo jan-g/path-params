@@ -17,7 +17,7 @@ type DatabaseReader interface {
 type DatabaseWriter interface {
 	AddApp(string)  error
 	DelApp(string)  error
-	SetRoute(string, string, string)  error
+	SetRoute(string, string, model.RouteData)  error
 	DelRoute(string, string)  error
 }
 
@@ -27,23 +27,24 @@ type Database interface {
 	Print()
 }
 
-type InmemDb struct {
+type inMemDb struct {
 	mu sync.RWMutex
 	paths map[string]*model.PathPart
 }
 
-func (db *InmemDb) LookupApp(app string) (*model.PathPart, error) {
+func (db *inMemDb) LookupApp(app string) (*model.PathPart, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
 	pp, ok := db.paths[app]
 	if !ok {
-		return nil, fmt.Errorf("app %v not found", app)
+		// a negative result is still okay, a valid response
+		return nil, nil
 	}
 	return pp, nil
 }
 
-func (db *InmemDb) LookupPart(app string, prefix string) (*model.PathPart, error) {
+func (db *inMemDb) LookupPart(app string, prefix string) (*model.PathPart, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
@@ -54,7 +55,7 @@ func (db *InmemDb) LookupPart(app string, prefix string) (*model.PathPart, error
 	return pp, nil
 }
 
-func (db *InmemDb) AddApp(app string) error {
+func (db *inMemDb) AddApp(app string) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -72,7 +73,7 @@ func (db *InmemDb) AddApp(app string) error {
 }
 
 
-func (db *InmemDb) DelApp(app string) error {
+func (db *inMemDb) DelApp(app string) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -89,7 +90,7 @@ func (db *InmemDb) DelApp(app string) error {
 	return nil
 }
 
-func (db *InmemDb) SetRoute(app string, path string, data string) error {
+func (db *inMemDb) SetRoute(app string, path string, data model.RouteData) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -121,7 +122,7 @@ func (db *InmemDb) SetRoute(app string, path string, data string) error {
 				node.Children[piece.next] = &model.PathPart_ChildNode{piece.next, nextGen}
 			}
 		} else {
-			node.Route = &model.PathPart_Route{data}
+			node.Route = &data
 		}
 	}
 
@@ -153,7 +154,7 @@ func splitPath(path string) []prefixPath {
 	return append(parts, prefixPath{prefix, ""})
 }
 
-func (db *InmemDb) DelRoute(app string, path string) error {
+func (db *inMemDb) DelRoute(app string, path string) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -196,25 +197,25 @@ func (db *InmemDb) DelRoute(app string, path string) error {
 }
 
 func NewDatabase(config interface{}) Database {
-	return &InmemDb{
+	return &inMemDb{
 		paths: map[string]*model.PathPart{},
 		mu: sync.RWMutex{},
 	}
 }
 
-func (db *InmemDb) Print() {
+func (db *inMemDb) Print() {
 	for _, k := range sortedKeys(db.paths) {
 		v := db.paths[k]
-		fmt.Printf("Prefix: %v gen %v ", k, v.Generation)
+		fmt.Printf("Prefix: %v gen %v ", k, v.GetGeneration())
 		if len(v.Children) != 0 {
 			fmt.Printf("    [")
 			for n, c := range v.Children {
-				fmt.Printf("%v#%v ", n, c.Generation)
+				fmt.Printf("%v#%v ", n, c.GetGeneration())
 			}
 			fmt.Printf("]")
 		}
 		if v.Route != nil {
-			fmt.Printf(" route data: %v", v.Route)
+			fmt.Printf(" route data: %v", v.GetRoute())
 		}
 		fmt.Println()
 	}
