@@ -27,6 +27,7 @@ func main() {
 	db.Print()
 	fmt.Println()
 
+	fmt.Println("Adding /some/other")
 	failIf(db.SetRoute("testApp", "/some/other", "/some/other is a prefix route"))
 	db.Print()
 	fmt.Println()

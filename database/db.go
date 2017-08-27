@@ -64,7 +64,7 @@ func (db *InmemDb) AddApp(app string) error {
 	}
 	db.paths[app] = &model.PathPart{
 		Path: app,
-		Generation: 1,
+		Generation: 0,
 		Children: map[string]*model.PathPart_ChildNode{},
 		Route: nil,
 	}
@@ -98,15 +98,17 @@ func (db *InmemDb) SetRoute(app string, path string, data string) error {
 		return fmt.Errorf("app %v does not exist", app)
 	}
 
+	nextGen := node.Generation + 1
+
 	for _, piece := range splitPath(path) {
 		// Update the generation of the parent node
 		node, ok = db.paths[app + piece.prefix]
 		if ok {
-			node.Generation ++
+			node.Generation = nextGen
 		} else {
 			node = &model.PathPart{
 				Path: app + piece.prefix,
-				Generation: 1,
+				Generation: nextGen,
 				Children: map[string]*model.PathPart_ChildNode{},
 			}
 			db.paths[app + piece.prefix] = node
@@ -114,9 +116,9 @@ func (db *InmemDb) SetRoute(app string, path string, data string) error {
 		if piece.next != "" {
 			child, ok := node.Children[piece.next]
 			if ok {
-				child.Generation ++
+				child.Generation = nextGen
 			} else {
-				node.Children[piece.next] = &model.PathPart_ChildNode{piece.next, 1}
+				node.Children[piece.next] = &model.PathPart_ChildNode{piece.next, nextGen}
 			}
 		} else {
 			node.Route = &model.PathPart_Route{data}
@@ -155,18 +157,19 @@ func (db *InmemDb) DelRoute(app string, path string) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	_, ok := db.paths[app]
+	node, ok := db.paths[app]
 	if !ok {
 		return fmt.Errorf("app %v does not exist", app)
 	}
 
-	node, ok := db.paths[app + path]
+	nextGen := node.Generation + 1
+
+	node, ok = db.paths[app + path]
 	if !ok || node.Route == nil {
 		return fmt.Errorf("app %v does not have a route for %v", app, path)
 	}
 
 	erase := len(node.Children) == 0
-	gen := uint64(0)
 
 	splits := splitPath(path)
 	for i := len(splits) - 1; i >= 0; i-- {
@@ -176,7 +179,7 @@ func (db *InmemDb) DelRoute(app string, path string) error {
 			if erase {
 				delete(node.Children, next)
 			} else {
-				node.Children[next].Generation = gen
+				node.Children[next].Generation = nextGen
 			}
 		} else {
 			node.Route = nil
@@ -185,8 +188,7 @@ func (db *InmemDb) DelRoute(app string, path string) error {
 			// This can only be true if erase was already true.
 			delete(db.paths, app + prefix)
 		} else {
-			node.Generation ++
-			gen = node.Generation
+			node.Generation = nextGen
 			erase = false
 		}
 	}
