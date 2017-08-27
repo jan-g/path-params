@@ -7,7 +7,6 @@ import (
 
 	"github.com/jan-g/path-params/model"
 	"github.com/jan-g/path-params/database"
-	"fmt"
 )
 
 type Cache interface {
@@ -66,12 +65,9 @@ func (c *cacheImpl) GetRoute(app string, path string) (*model.RouteData, map[str
 	params := []string{}
 	pieces := strings.Split(path, "/")[1:]
 	prefix := ""
-	fmt.Println("** app =", app, "; part =", part)
 	search: for i, piece := range pieces {
-		fmt.Println("**   searching for", piece, "; prefix =", prefix)
 		var item string
 		item, gen, part, err = c.nextPart(app, prefix, gen, part, piece, ":", "&")
-		fmt.Println("**   -> item =", item, "; gen =", gen, "; part =", part, "; err =", err)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -258,9 +254,7 @@ begin:
 		}
 	} else {
 		// We've got an up-to-date node. Go looking for a matching item
-		fmt.Println("****    items =", items, "; part.paths =", part.paths)
 		for _, item := range items {
-			fmt.Println("****      item =", item)
 			child, ok := part.paths[item]
 			if ok {
 				c.mu.RUnlock()
